@@ -1,15 +1,17 @@
-use leptos::{mount::mount_to_body, prelude::*};
+mod search;
 
-#[component]
-fn App() -> impl IntoView {
-    view! {
-        <main>
-            <h1>Leptos Starter</h1>
-            <p>Ready to build.</p>
-        </main>
-    }
+#[cfg(target_arch = "wasm32")]
+mod app;
+#[cfg(not(target_arch = "wasm32"))]
+mod server;
+
+#[cfg(target_arch = "wasm32")]
+fn main() {
+    leptos::mount::mount_to_body(app::App);
 }
 
-fn main() {
-    mount_to_body(App);
+#[cfg(not(target_arch = "wasm32"))]
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    server::serve().await
 }

@@ -1,7 +1,7 @@
 # wspr-live-client
 
-Minimal standalone asynchronous Rust library for querying WSPR.live receiving reports.
-It does not depend on Leptos. The existing Leptos starter remains unchanged.
+Minimal standalone asynchronous Rust library for querying WSPR.live transmission and reception reports.
+The WSPRviz server uses this library to run searches. The default `http` feature provides the native client. With default features disabled, the library exposes the shared `Reception` type for the Leptos frontend.
 
 ## Run an example
 
@@ -36,6 +36,8 @@ let spots = WsprLiveClient::new()?.receptions(&query).await?;
 all comparisons are performed using UTC epoch seconds. The default result limit is 500;
 maximum is 5,000. Results are sorted newest first.
 
+Queries default to reports received by the callsign. Use `.direction(wspr_live_client::SpotDirection::Transmitted)` to find reports of that callsign's transmissions, matching `tx_sign`.
+
 ## Data notes
 
 - `rx_sign` identifies the receiving station; `tx_sign` the transmitting station.
@@ -43,6 +45,5 @@ maximum is 5,000. Results are sorted newest first.
 - WSPR.live recommends limiting queries by time **and band** when practical. Keep ranges small.
 - Raw spots may include duplicates and incorrect reports.
 - The public service is for noncommercial use and may be intermittently unavailable.
-- Browser-based Leptos/WASM integration would require a browser-compatible HTTP client; this native Rust library is suitable for server-side integration or command-line use without changes. It is deliberately independent of the UI.
 
 See https://wspr.live/ for public API details and service terms.

@@ -1,14 +1,21 @@
 //! Small, read-only client for the WSPR.live ClickHouse HTTP API.
 //! WSPR.live permits only the `query` URL parameter and GET requests.
 
+use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "http")]
 use chrono::{DateTime, Utc};
-use serde::Deserialize;
+#[cfg(feature = "http")]
 use std::time::Duration;
 
+#[cfg(feature = "http")]
 const ENDPOINT: &str = "https://db1.wspr.live/";
+#[cfg(feature = "http")]
 const DEFAULT_LIMIT: u32 = 500;
+#[cfg(feature = "http")]
 const MAX_LIMIT: u32 = 5_000;
 
+#[cfg(feature = "http")]
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("invalid callsign: use 1-20 ASCII letters, digits, or /")]
@@ -22,7 +29,7 @@ pub enum Error {
 }
 
 /// A report in which a receiver decoded a transmitter's WSPR signal.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Reception {
     pub id: u64,
     /// WSPR.live returns time as a UTC-like ClickHouse DateTime string.
@@ -40,6 +47,15 @@ pub struct Reception {
     pub drift: i8,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SpotDirection {
+    Transmitted,
+    #[default]
+    Received,
+}
+
+#[cfg(feature = "http")]
 #[derive(Debug, Clone)]
 pub struct ReceptionQuery {
     pub callsign: String,
@@ -47,16 +63,30 @@ pub struct ReceptionQuery {
     pub end: DateTime<Utc>,
     /// WSPR.live band values: 14 = 20m, 7 = 40m, 28 = 10m, etc.
     pub band: Option<i16>,
+    /// Transmitted power encoded in the WSPR message, in dBm.
+    pub power: Option<i8>,
     pub limit: u32,
+    pub direction: SpotDirection,
 }
 
+#[cfg(feature = "http")]
 impl ReceptionQuery {
     pub fn new(callsign: impl Into<String>, start: DateTime<Utc>, end: DateTime<Utc>) -> Self {
-        Self { callsign: callsign.into(), start, end, band: None, limit: DEFAULT_LIMIT }
+        Self { callsign: callsign.into(), start, end, band: None, power: None, limit: DEFAULT_LIMIT, direction: SpotDirection::Received }
+    }
+
+    pub fn direction(mut self, direction: SpotDirection) -> Self {
+        self.direction = direction;
+        self
     }
 
     pub fn band(mut self, band: i16) -> Self {
         self.band = Some(band);
+        self
+    }
+
+    pub fn power(mut self, power: i8) -> Self {
+        self.power = Some(power);
         self
     }
 
@@ -82,30 +112,40 @@ impl ReceptionQuery {
 
         // Numeric UNIX UTC timestamps avoid any ambiguous local timezone parsing.
         // ClickHouse supports DateTime comparisons via fromUnixTimestamp().
+        let callsign_column = match self.direction {
+            SpotDirection::Transmitted => "tx_sign",
+            SpotDirection::Received => "rx_sign",
+        };
         let mut sql = format!(
             "SELECT id, time, band, rx_sign, rx_loc, tx_sign, tx_loc, distance, azimuth, \
-             frequency, power, snr, drift FROM wspr.rx WHERE rx_sign = '{callsign}' \
+             frequency, power, snr, drift FROM wspr.rx WHERE {callsign_column} = '{callsign}' \
              AND time >= fromUnixTimestamp({}) AND time < fromUnixTimestamp({})",
             self.start.timestamp(), self.end.timestamp()
         );
         if let Some(band) = self.band {
             sql.push_str(&format!(" AND band = {band}"));
         }
+        if let Some(power) = self.power {
+            sql.push_str(&format!(" AND power = {power}"));
+        }
         sql.push_str(&format!(" ORDER BY time DESC LIMIT {} FORMAT JSON", self.limit));
         Ok(sql)
     }
 }
 
+#[cfg(feature = "http")]
 #[derive(Debug, Deserialize)]
 struct ClickHouseResponse {
     data: Vec<Reception>,
 }
 
+#[cfg(feature = "http")]
 #[derive(Clone, Debug)]
 pub struct WsprLiveClient {
     http: reqwest::Client,
 }
 
+#[cfg(feature = "http")]
 impl WsprLiveClient {
     pub fn new() -> Result<Self, Error> {
         Ok(Self {
@@ -116,7 +156,7 @@ impl WsprLiveClient {
         })
     }
 
-    /// Fetch spots received by `query.callsign` in the half-open UTC interval [start, end).
+    /// Fetch spots matching the callsign and direction in the half-open UTC interval [start, end).
     pub async fn receptions(&self, query: &ReceptionQuery) -> Result<Vec<Reception>, Error> {
         let sql = query.sql()?;
         let response = self.http.get(ENDPOINT).query(&[("query", sql)]).send().await?
@@ -125,7 +165,7 @@ impl WsprLiveClient {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "http"))]
 mod tests {
     use super::*;
     use chrono::TimeZone;
@@ -143,6 +183,28 @@ mod tests {
         assert!(sql.contains("time < fromUnixTimestamp(1700003600)"));
         assert!(sql.contains("band = 14"));
         assert!(sql.contains("LIMIT 100 FORMAT JSON"));
+    }
+
+    #[test]
+    fn transmitted_sql_filters_the_transmitter() {
+        let sql = sample().direction(SpotDirection::Transmitted).band(14).sql().unwrap();
+        assert!(sql.contains("WHERE tx_sign = 'N9IOX'"));
+        assert!(!sql.contains("WHERE rx_sign ="));
+        assert!(sql.contains("time >= fromUnixTimestamp(1700000000)"));
+        assert!(sql.contains("time < fromUnixTimestamp(1700003600)"));
+        assert!(sql.contains("band = 14"));
+    }
+
+    #[test]
+    fn power_filter_applies_within_the_time_range_before_the_limit() {
+        for power in [27, 30] {
+            let sql = sample().direction(SpotDirection::Transmitted).band(14).power(power).sql().unwrap();
+            assert!(sql.contains("WHERE tx_sign = 'N9IOX'"));
+            assert!(sql.contains("time >= fromUnixTimestamp(1700000000)"));
+            assert!(sql.contains("time < fromUnixTimestamp(1700003600)"));
+            assert!(sql.contains(&format!("AND band = 14 AND power = {power} ORDER BY time DESC LIMIT 500")));
+        }
+        assert!(!sample().sql().unwrap().contains("AND power ="));
     }
 
     #[test]

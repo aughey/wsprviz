@@ -1,0 +1,170 @@
+:root {
+  font-family: "Instrument Sans", system-ui, sans-serif;
+  color: #172626;
+  background: #f5f8f7;
+}
+
+main {
+  max-width: 72rem;
+  margin: 2.5rem auto;
+  padding: 0 1rem;
+}
+
+form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 1rem;
+  padding: 1rem;
+  background: white;
+  border: 1px solid #d2dfdb;
+  border-radius: .5rem;
+}
+
+label {
+  display: grid;
+  gap: .35rem;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.range-presets {
+  flex-basis: 100%;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.range-presets legend {
+  padding: 0;
+  margin-bottom: .5rem;
+  font-weight: 600;
+}
+
+.range-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+}
+
+.range-buttons button {
+  color: #115d50;
+  background: white;
+}
+
+.range-buttons button[aria-pressed="true"] {
+  color: white;
+  background: #115d50;
+}
+
+input, select, button {
+  box-sizing: border-box;
+  min-height: 2.5rem;
+  max-width: 100%;
+  padding: .45rem .65rem;
+  border: 1px solid #849c96;
+  border-radius: .3rem;
+  font: inherit;
+  background: white;
+}
+
+input[name="callsign"] {
+  width: 11rem;
+}
+
+button {
+  border-color: #115d50;
+  color: white;
+  background: #115d50;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: .65;
+  cursor: wait;
+}
+
+[role="alert"] {
+  color: #972c2c;
+}
+
+.results-table {
+  overflow-x: auto;
+  border: 1px solid #d2dfdb;
+  border-radius: .5rem;
+}
+
+.reception-map {
+  width: 100%;
+  height: clamp(20rem, 55vh, 38rem);
+  border: 1px solid #d2dfdb;
+  border-radius: .5rem;
+  overflow: hidden;
+  margin-bottom: 1rem;
+  background: #e6efec;
+}
+
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.home-marker {
+  color: #115d50;
+  font-size: 1.4rem;
+}
+
+.remote-marker {
+  color: #be5423;
+}
+
+.map-help {
+  font-size: .9rem;
+}
+
+.map-popup {
+  max-width: 18rem;
+  max-height: 10rem;
+  overflow-y: auto;
+  white-space: pre-line;
+  padding: .65rem;
+  background: white;
+  border: 1px solid #849c96;
+  border-radius: .3rem;
+  box-shadow: 0 2px 8px #17262633;
+}
+
+.reception-map .ol-control button {
+  padding: 0;
+  min-height: 0;
+  color: #172626;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+th, td {
+  padding: .55rem .75rem;
+  border-bottom: 1px solid #d2dfdb;
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  background: #e6efec;
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
